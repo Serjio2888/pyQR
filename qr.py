@@ -73,14 +73,13 @@ class ToDo:
             print(error_msg)
         vk = vk_session.get_api()
         while True:
-            url = []
-            for _ in range(self.q2.qsize()):
-                photos = self.q2.get()         
-                url.append(vk.photos.getById(photos=photos, extends=0)[0]['sizes'][6]['url'])
+            photos = self.q2.get()         
+            url = vk.photos.getById(photos=photos, extends=0)[0]['sizes'][6]['url']
 
-                self.sending(url)
-        
-    def sending(self,urls):
+            proc = Process(target=self.sending, args=(url,))
+            proc.start()
+            
+    def sending(self,url):
         vk_session = vk_api.VkApi( #токен группы
             token=access_token)
 
@@ -90,19 +89,18 @@ class ToDo:
         upload = VkUpload(vk_session)
         session = requests.Session()
 
-        for url in urls:
-            image = session.get(url, stream=True)
-            photo = upload.photo_messages(photos=image.raw)[0]
-            attachments.append(
-                'photo{}_{}'.format(photo['owner_id'], photo['id'])
+        image = session.get(url, stream=True)
+        photo = upload.photo_messages(photos=image.raw)[0]
+        attachments.append(
+            'photo{}_{}'.format(photo['owner_id'], photo['id'])
+        )
+
+        vk.messages.send(
+            user_id=u_id, #кому отправляем
+            attachment=','.join(attachments),
+            message='Ваш код готов!',
+            random_id = randint(1, 999999)
             )
-            
-            vk.messages.send(
-                user_id=u_id, #кому отправляем
-                attachment=','.join(attachments),
-                message='Ваш код готов!',
-                random_id = randint(1, 999999)
-                )
 
 
 to = ToDo()
