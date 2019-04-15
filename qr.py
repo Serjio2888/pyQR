@@ -73,12 +73,14 @@ class ToDo:
             print(error_msg)
         vk = vk_session.get_api()
         while True:
-            photos = self.q2.get()         
-            url = vk.photos.getById(photos=photos, extends=0)[0]['sizes'][6]['url']
+            url = []
+            for _ in range(self.q2.qsize()):
+                photos = self.q2.get()         
+                url.append(vk.photos.getById(photos=photos, extends=0)[0]['sizes'][6]['url'])
 
-            self.sending(url)
+                self.sending(url)
         
-    def sending(self,url):
+    def sending(self,urls):
         vk_session = vk_api.VkApi( #токен группы
             token=access_token)
 
@@ -88,18 +90,19 @@ class ToDo:
         upload = VkUpload(vk_session)
         session = requests.Session()
 
-        image = session.get(url, stream=True)
-        photo = upload.photo_messages(photos=image.raw)[0]
-        attachments.append(
-            'photo{}_{}'.format(photo['owner_id'], photo['id'])
-        )
-        
-        vk.messages.send(
-            user_id=u_id,#кому отправляем
-            attachment=','.join(attachments),
-            message='Ваш код готов!',
-            random_id = randint(1, 999999)
+        for url in urls:
+            image = session.get(url, stream=True)
+            photo = upload.photo_messages(photos=image.raw)[0]
+            attachments.append(
+                'photo{}_{}'.format(photo['owner_id'], photo['id'])
             )
+            
+            vk.messages.send(
+                user_id=u_id, #кому отправляем
+                attachment=','.join(attachments),
+                message='Ваш код готов!',
+                random_id = randint(1, 999999)
+                )
 
 
 to = ToDo()
@@ -110,7 +113,7 @@ def play():
         to.do_photo(name)
         sleep(0.1)
 
-for i in range(4):
+for i in range(3):
     proc = Process(target=play, args=())
     proc.start()    
 
@@ -127,7 +130,7 @@ vk = vk_session.get_api()
 proc = Process(target=to.photo_load, args=(upload,))
 proc.start()
 
-for i in range(4):
+for i in range(5):
     proc = Process(target=to.album, args=())
     proc.start() 
 
