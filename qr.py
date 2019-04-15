@@ -55,12 +55,9 @@ class ToDo:
                                     album_id=a_id,
                                     group_id=g_id
             )
-            photos = '{}_{}'.format(
-                photo[0]['owner_id'], photo[0]['id']
-            )
             remove(name) #удаляем изображение
 
-            self.q2.put(photos)
+            self.q2.put(photo[0]['sizes'][6]['url'])
             sleep(0.5)
             
     def album(self):
@@ -73,10 +70,10 @@ class ToDo:
             print(error_msg)
         vk = vk_session.get_api()
         while True:
+            
             photos = self.q2.get()         
-            url = vk.photos.getById(photos=photos, extends=0)[0]['sizes'][6]['url']
 
-            proc = Process(target=self.sending, args=(url,))
+            proc = Process(target=self.sending, args=(photos,))
             proc.start()
             
     def sending(self,url):
