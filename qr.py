@@ -2,37 +2,24 @@ import vk_api
 import requests
 from random import randint
 from PIL import Image
-#python3.7 не поддерживает Pillow(одни проблемы с ним), так что используем 3.6 или ниже
+#python3.7 не поддерживает Pillow, так что используем 3.6 или ниже
 import pyqrcode
 from time import sleep
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api import VkUpload
 from multiprocessing import Process, Queue
-#так же через пип должен быть установлен модуль pypng, импортить его не нужно
+#так же через пип должен быть установлен модуль pypng
 
 from datetime import datetime
 from os import remove
 
 class ToDo:
-    """
-        С помощью пиллоу склеиваю шаблон и кьюаркод,
-        потом отправляю его в альбом группы, от имени которой общается бот,
-        который и отправляет это всё мне в лс.
-        Чтобы проверить работоспособность достаточно написать что-то боту https://vk.com/public180755234,
-        везде прописать свой логин и пароль от вк, а в фукнции sending добавить свой айди, вместо моего:
-        vk.messages.send(
-            user_id = **********...
-        Максимальное быстродействие у меня было при таком количестве процессов, как тут.
-        Но скорость все равно оставляет желать лучшего, надеюсь, из-за интернет-соединения
-    """
     def __init__(self):
         self.q = Queue()#очередь с путями к изображениям, которые буду выгружать в группу
-        self.q2 = Queue()#ссылка на фотографии в вк, которые кидаю в лс
-        
+
     def do_qr(self, url): #создаем qr_code в формате png
         url = pyqrcode.create(url)
-        way = 'photos/'+str(randint(1,999999))+'.png'#такая сложность нужна, 
-                                                    #чтобы вдруг не создать две одинаковых картинки
+        way = 'photos/'+str(randint(1,999999))+'.png'
         url.png(way,
                 scale=10, 
                 module_color=[0,0,0,255], 
@@ -41,63 +28,42 @@ class ToDo:
 
     def do_photo(self,name): #qr_code клеим в шаблон (foto.png)
         img = Image.open('foto.png').convert("RGBA")
-        mark = Image.open(name).convert("RGBA") #без конвертации кидается ошибками
+        mark = Image.open(name).convert("RGBA") 
         img.paste(mark, (90, 100), mark)
         new_name = 'qrs/'+str(randint(1,999999))+'.png'
         img.save(new_name)
         self.q.put(new_name)
-        remove(name) #удаляем картинощку
+        remove(name) 
 
-    def photo_load(self, upload): #грузим шаблон с кодом в альбом группы(эта операция не чаще чем раз в 0.5 сек)
+    def messaging(self):
         while True:
-            name = self.q.get()
-            photo = upload.photo( name,
-                                    album_id=a_id,
-                                    group_id=g_id
-            )
-            remove(name) #удаляем изображение
-
-            self.q2.put(photo[0]['sizes'][6]['url'])
-            sleep(0.5)
-            
-    def album(self):
-        login, password = 'login', 'pass'#вк кидает ошибку, если аутентифицироваться
-                                                            #не в функции. причину не нашел
-        vk_session = vk_api.VkApi(login, password)
-        try:
+            vk_session = vk_api.VkApi('login', 'pass')
             vk_session.auth(token_only=True)
-        except vk_api.AuthError as error_msg:
-            print(error_msg)
-        vk = vk_session.get_api()
-        while True:
-            
-            photos = self.q2.get()         
+            upload = vk_api.VkUpload(vk_session)
 
-            proc = Process(target=self.sending, args=(photos,))
-            proc.start()
-            
-    def sending(self,url):
-        vk_session = vk_api.VkApi( #токен группы
-            token=access_token)
+            name = self.q.get()
 
-        longpoll = VkLongPoll(vk_session)
-        vk = vk_session.get_api()
-        attachments = []
-        upload = VkUpload(vk_session)
-        session = requests.Session()
+            #грузим в альбом
+            photo = upload.photo(name, album_id='a_id', 
+                                        group_id='g_id')
+            remove(name)
 
-        image = session.get(url, stream=True)
-        photo = upload.photo_messages(photos=image.raw)[0]
-        attachments.append(
-            'photo{}_{}'.format(photo['owner_id'], photo['id'])
-        )
-
-        vk.messages.send(
-            user_id=u_id, #кому отправляем
-            attachment=','.join(attachments),
-            message='Ваш код готов!',
-            random_id = randint(1, 999999)
+            vk_session = vk_api.VkApi(token='token')
+            vk = vk_session.get_api()
+            attachments = []
+            attachments.append(
+                'photo{}_{}'.format(photo['owner_id'], photo['id'])
             )
+
+            #отправляем в ЛС
+            vk.messages.send(
+                user_id='u_id',
+                attachment=','.join(attachments),
+                message='Ваш код готов!',
+                random_id=randint(1, 999999)
+            )
+
+            sleep(0.5)
 
 
 to = ToDo()
@@ -112,21 +78,7 @@ for i in range(3):
     proc = Process(target=play, args=())
     proc.start()    
 
-
-login, password = 'login', 'pass'
-vk_session = vk_api.VkApi(login, password)
-try:
-    vk_session.auth(token_only=True)
-except vk_api.AuthError as error_msg:
-    print(error_msg)
-upload = vk_api.VkUpload(vk_session)
-vk = vk_session.get_api()
-
-proc = Process(target=to.photo_load, args=(upload,))
-proc.start()
-
-for i in range(5):
-    proc = Process(target=to.album, args=())
-    proc.start() 
+proc = Process(target=to.messaging, args=())
+proc.start() 
 
 
