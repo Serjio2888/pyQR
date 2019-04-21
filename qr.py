@@ -36,27 +36,27 @@ class ToDo:
         remove(name) 
 
     def messaging(self):
-        while True:
-            vk_session = vk_api.VkApi('login', 'pass')
-            vk_session.auth(token_only=True)
-            upload = vk_api.VkUpload(vk_session)
+        vk_session = vk_api.VkApi('login', 'pass')
+        vk_session.auth(token_only=True)
+        upload = vk_api.VkUpload(vk_session)
 
+        vk_session2 = vk_api.VkApi(token='token')
+        vk2 = vk_session2.get_api()
+
+        while True:
             name = self.q.get()
 
             #грузим в альбом
             photo = upload.photo(name, album_id='a_id', 
                                         group_id='g_id')
-            remove(name)
 
-            vk_session = vk_api.VkApi(token='token')
-            vk = vk_session.get_api()
             attachments = []
             attachments.append(
                 'photo{}_{}'.format(photo['owner_id'], photo['id'])
             )
 
             #отправляем в ЛС
-            vk.messages.send(
+            vk2.messages.send(
                 user_id='u_id',
                 attachment=','.join(attachments),
                 message='Ваш код готов!',
